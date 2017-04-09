@@ -8,11 +8,13 @@ Neo4j::Session.open(:server_db, "http://neo4j:#{neo4jpwd}@localhost:7474")
 nodes = []
 relations = []
 File.open(tsv_file).each_line do |l|
-  pref_from, prefs = l.chomp.split("\t")
-  prefs.to_s.split(',').each do |pref|
-    relations.push([pref_from, pref.strip])
+  next if l[0, 1] == '#'
+  pref1, pref2, bridge_flag = l.chomp.split("\t")
+  if pref1 && pref2
+    relations.push([pref1, pref2, bridge_flag.to_i])
   end
-  nodes.push(pref_from)
+  nodes.push(pref1) if pref1
+  nodes.push(pref2) if pref2
 end
 
 nodes.uniq.each do |node|
@@ -22,9 +24,10 @@ end
 relations.uniq.each do |rel|
   nodeFrom = Neo4j::Label.find_nodes(:Pref, :name, rel[0])
   nodeTo = Neo4j::Label.find_nodes(:Pref, :name, rel[1])
+  connection = rel[2] > 0 ? 'bridge' : 'road'
   nodeFrom.each do |n1|
     nodeTo.each do |n2|
-      n1.create_rel(:Adjoin, n2)
+      n1.create_rel(:Adjoin, n2, connection: connection)
     end
   end
 end
